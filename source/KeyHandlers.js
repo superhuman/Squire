@@ -207,7 +207,7 @@ var keyHandlers = {
             }
         }
 
-        if ( !block.textContent || block.textContent == " " ) {
+        if ( isEmptyBlock(block) || block.textContent == " " ) {
 
             // Break list
             if ( getNearest ( block, root, 'PRE' )) {
@@ -328,7 +328,7 @@ var keyHandlers = {
                     return;
                 }
                 // Otherwise merge.
-                mergeWithBlock( previous, current, range );
+                mergeWithBlock( previous, current, range, root );
                 // If deleted line between containers, merge newly adjacent
                 // containers.
                 current = previous.parentNode;
@@ -411,7 +411,7 @@ var keyHandlers = {
                     return;
                 }
                 // Otherwise merge.
-                mergeWithBlock( current, next, range );
+                mergeWithBlock( current, next, range, root );
                 // If deleted line between containers, merge newly adjacent
                 // containers.
                 next = current.parentNode;
