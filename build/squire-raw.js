@@ -1336,8 +1336,12 @@ var onKey = function ( event ) {
 
     if ( this._keyHandlers[ key ] ) {
         this._keyHandlers[ key ]( this, event, range );
+<<<<<<< HEAD
     } else if ( key.length === 1 && !range.collapsed ) {
         var initialStartOffset = range.startOffset
+=======
+    } else if ( !range.collapsed && ( event.key || key ).length === 1 ) {
+>>>>>>> b0ac7d3... Handle all cases of overwriting content
         // Record undo checkpoint.
         this.saveUndoState( range );
         // Delete the selection
