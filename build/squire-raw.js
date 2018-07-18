@@ -1339,11 +1339,25 @@ var onKey = function ( event ) {
     if ( this._keyHandlers[ key ] ) {
         this._keyHandlers[ key ]( this, event, range );
     } else if ( key.length === 1 && !range.collapsed ) {
+        var initialStartOffset = range.startOffset
         // Record undo checkpoint.
         this.saveUndoState( range );
         // Delete the selection
         deleteContentsOfRange( range, this._root );
         this._ensureBottomLine();
+
+        // double clicking a word and typing deletes the space after it
+        // caused because a '  ' is automatically cleaned by the HTML to ' '
+        // the fix inserts a ZWS in between the spaces => ' \u200b '
+        // and leaves the ZWS selected so it is replaced by the onKey event
+        var textContent = range.startContainer.textContent
+        var spliceIndex = range.startOffset
+        // if the delete was successful, the startContainer should be the endContainer
+        if (range.startContainer === range.endContainer && textContent.charAt( spliceIndex ) === ' ' && textContent.charAt( spliceIndex - 1 ) === ' ') {
+          range.startContainer.textContent = textContent.substring( 0, spliceIndex ) + '\u200b' + textContent.substring( spliceIndex, textContent.length )
+          range.setStart( range.startContainer, initialStartOffset );
+          range.setEnd( range.startContainer, initialStartOffset + 1 );
+        }
         this.setSelection( range );
         this._updatePath( range, true );
     }
@@ -1470,7 +1484,7 @@ var keyHandlers = {
             // Break list
             if ( getNearest ( block, root, 'PRE' )) {
                 // <div> inside <pre> cannot be empty to be focused, it will contain a space when getting here, make sure we clear it
-                block.textContent = block.textContent.replace(" ", "", 1)                    
+                block.textContent = block.textContent.replace(" ", "", 1)
                 return self.modifyBlocks( decreaseSpecialElementLevel, range );
             }
             else if ( getNearest( block, root, 'UL' ) ||
@@ -1480,14 +1494,14 @@ var keyHandlers = {
             // Break blockquote
             else if ( getNearest( block, root, 'BLOCKQUOTE' ) ) {
                 return self.modifyBlocks( removeBlockQuote, range );
-            } 
-        
+            }
+
         }
 
         // Otherwise, split at cursor point.
         nodeAfterSplit = splitBlock( self, block,
             range.startContainer, range.startOffset );
-        
+
         // Clean up any empty inlines if we hit enter at the beginning of the
         // block
         removeZWS( block );
@@ -1550,9 +1564,9 @@ var keyHandlers = {
         // If contains an inline element don't delete on first line, instead preventDefault and insert ZWS to keep tags
         // Make sure the cursor is not at the start of line
         else if ( (range.endOffset != 0) &&
-            self.hasFormat( 'b', null, range ) || 
-            self.hasFormat( 'i', null, range ) || 
-            self.hasFormat( 'u', null, range ) || 
+            self.hasFormat( 'b', null, range ) ||
+            self.hasFormat( 'i', null, range ) ||
+            self.hasFormat( 'u', null, range ) ||
             self.hasFormat( 'span', null, range )
         ) {
             var current = getStartBlockOfRange( range, root );
@@ -1638,13 +1652,12 @@ var keyHandlers = {
             afterDelete( self, range );
         }
         else if (
-            self.hasFormat( 'b', null, range ) || 
-            self.hasFormat( 'i', null, range ) || 
-            self.hasFormat( 'u', null, range ) || 
+            self.hasFormat( 'b', null, range ) ||
+            self.hasFormat( 'i', null, range ) ||
+            self.hasFormat( 'u', null, range ) ||
             self.hasFormat( 'span', null, range )
         ) {
             var current = getStartBlockOfRange( range, root );
-            console.log(current, 'current')
             if ( current && current.firstChild.innerText && getLength( current.firstChild.innerText.replace(/^\u200b*/, '') ) == 1 ) {
                 event.preventDefault();
                 current.firstChild.innerText = '';
