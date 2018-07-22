@@ -1339,11 +1339,25 @@ var onKey = function ( event ) {
     if ( this._keyHandlers[ key ] ) {
         this._keyHandlers[ key ]( this, event, range );
     } else if ( key.length === 1 && !range.collapsed ) {
+        var initialStartOffset = range.startOffset
         // Record undo checkpoint.
         this.saveUndoState( range );
         // Delete the selection
         deleteContentsOfRange( range, this._root );
         this._ensureBottomLine();
+
+        // double clicking a word and typing deletes the space after it
+        // caused because a '  ' is automatically cleaned by the HTML to ' '
+        // the fix inserts a ZWS in between the spaces => ' \u200b '
+        // and leaves the ZWS selected so it is replaced by the onKey event
+        var textContent = range.startContainer.textContent
+        var spliceIndex = range.startOffset
+        // if the delete was successful, the startContainer should be the endContainer
+        if (range.startContainer === range.endContainer && textContent.charAt( spliceIndex ) === ' ' && textContent.charAt( spliceIndex - 1 ) === ' ') {
+          range.startContainer.textContent = textContent.substring( 0, spliceIndex ) + '\u200b' + textContent.substring( spliceIndex, textContent.length )
+          range.setStart( range.startContainer, initialStartOffset );
+          range.setEnd( range.startContainer, initialStartOffset + 1 );
+        }
         this.setSelection( range );
         this._updatePath( range, true );
     }
@@ -1468,21 +1482,26 @@ var keyHandlers = {
         if ( !block.textContent || block.textContent == " " ) {
 
             // Break list
-            if ( getNearest( block, root, 'UL' ) ||
+            if ( getNearest ( block, root, 'PRE' )) {
+                // <div> inside <pre> cannot be empty to be focused, it will contain a space when getting here, make sure we clear it
+                block.textContent = block.textContent.replace(" ", "", 1)
+                return self.modifyBlocks( decreaseSpecialElementLevel, range );
+            }
+            else if ( getNearest( block, root, 'UL' ) ||
                     getNearest( block, root, 'OL' ) ) {
                 return self.modifyBlocks( decreaseListLevel, range );
             }
             // Break blockquote
             else if ( getNearest( block, root, 'BLOCKQUOTE' ) ) {
                 return self.modifyBlocks( removeBlockQuote, range );
-            } 
-        
+            }
+
         }
 
         // Otherwise, split at cursor point.
         nodeAfterSplit = splitBlock( self, block,
             range.startContainer, range.startOffset );
-        
+
         // Clean up any empty inlines if we hit enter at the beginning of the
         // block
         removeZWS( block );
@@ -1531,12 +1550,7 @@ var keyHandlers = {
     },
     backspace: function ( self, event, range ) {
         var root = self._root;
-        
-        // Bold/italic gets confused at the transition point,
-        // by not removing zero width space we keep this distinction. Ref #7567
-        // self._removeZWS();
-
-
+        self._removeZWS();
         // Record undo checkpoint.
         self.saveUndoState( range );
 
@@ -1550,9 +1564,9 @@ var keyHandlers = {
         // If contains an inline element don't delete on first line, instead preventDefault and insert ZWS to keep tags
         // Make sure the cursor is not at the start of line
         else if ( (range.endOffset != 0) &&
-            self.hasFormat( 'b', null, range ) || 
-            self.hasFormat( 'i', null, range ) || 
-            self.hasFormat( 'u', null, range ) || 
+            self.hasFormat( 'b', null, range ) ||
+            self.hasFormat( 'i', null, range ) ||
+            self.hasFormat( 'u', null, range ) ||
             self.hasFormat( 'span', null, range )
         ) {
             var current = getStartBlockOfRange( range, root );
@@ -1578,11 +1592,8 @@ var keyHandlers = {
             // Now get previous block
             previous = getPreviousBlock( current, root );
 
-            var forceBreakElement = getNearest( current, root, 'PRE' ) && !current.nextSibling
-
             // Must not be at the very beginning of the text area.
-            if ( previous) {
-
+            if ( previous ) {
                 // If not editable, just delete whole block.
                 if ( !previous.isContentEditable ) {
                     detach( previous );
@@ -1592,7 +1603,6 @@ var keyHandlers = {
                 mergeWithBlock( previous, current, range );
                 // If deleted line between containers, merge newly adjacent
                 // containers.
-
                 current = previous.parentNode;
                 while ( current !== root && !current.nextSibling ) {
                     current = current.parentNode;
@@ -1600,12 +1610,10 @@ var keyHandlers = {
                 if ( current !== root && ( current = current.nextSibling ) ) {
                     mergeContainers( current, root );
                 }
-
                 self.setSelection( range );
             }
             // If at very beginning of text area, allow backspace
-            // to break lists/blockquote/pre. For elements like <pre>, backspace will
-            // break even if at the beginning of the element, not only text area
+            // to break lists/blockquote.
             else if ( current ) {
                 // Break list
                 if ( getNearest ( current, root, 'PRE' )) {
@@ -1644,9 +1652,9 @@ var keyHandlers = {
             afterDelete( self, range );
         }
         else if (
-            self.hasFormat( 'b', null, range ) || 
-            self.hasFormat( 'i', null, range ) || 
-            self.hasFormat( 'u', null, range ) || 
+            self.hasFormat( 'b', null, range ) ||
+            self.hasFormat( 'i', null, range ) ||
+            self.hasFormat( 'u', null, range ) ||
             self.hasFormat( 'span', null, range )
         ) {
             var current = getStartBlockOfRange( range, root );
@@ -3907,13 +3915,12 @@ var makeList = function ( self, frag, type ) {
     }
 };
 
-var makeSpecialElement = function ( self, frag, type ) {
+var makeSpecialElement = function ( self, frag, type, marginLeft ) {
     var walker = getBlockWalker( frag, self._root ),
         node, tag, prev, newLi,
         tagAttributes = self._config.tagAttributes,
         listAttrs = tagAttributes[ type.toLowerCase() ],
         listItemAttrs = self._config.blockTag.toLowerCase(),
-        style = self._config.preStyle,
         root = self._root;
     
     while ( node = walker.nextNode() ) {
@@ -3936,11 +3943,9 @@ var makeSpecialElement = function ( self, frag, type ) {
                 var newElement = self.createElement( type, listAttrs, [
                     newLi
                 ])
-
-                // apply style
-                Object.keys(style).forEach( function ( key ) {
-                    newElement.style[key] = style[key];
-                })
+                if ( marginLeft ) {
+                    newElement.style.marginLeft = marginLeft;
+                }
 
                 replaceWith(
                     node,
@@ -3976,7 +3981,7 @@ var makeUnorderedList = function ( frag ) {
 };
 
 var makePre = function ( frag ) {
-    makeSpecialElement( this, frag, 'PRE' );
+    makeSpecialElement( this, frag, 'PRE', '20px' );
     return frag;
 };
 
