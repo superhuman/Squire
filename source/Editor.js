@@ -577,10 +577,8 @@ proto.getPath = function () {
 // the bottom of the tree so the block can be selected. Define that node as the
 // keepNode.
 var removeZWS = function ( root, keepNode ) {
-    var walker = new TreeWalker( root, SHOW_TEXT, function () {
-            return true;
-        }, false ),
-        parent, node, index;
+    var walker = new TreeWalker( root, SHOW_TEXT );
+    var parent, node, index;
     while ( node = walker.nextNode() ) {
         while ( ( index = node.data.indexOf( ZWS ) ) > -1  &&
                 ( !keepNode || node.parentNode !== keepNode ) ) {
@@ -936,7 +934,7 @@ proto.hasFormat = function ( tag, attributes, range ) {
     // the selection and make sure all of them have the format we want.
     walker = new TreeWalker( common, SHOW_TEXT, function ( node ) {
         return isNodeContainedInRange( range, node, true );
-    }, false );
+    });
 
     var seenNode = false;
     while ( node = walker.nextNode() ) {
@@ -1040,8 +1038,7 @@ proto._addFormat = function ( tag, attributes, range ) {
                         node.nodeName === 'BR' ||
                         node.nodeName === 'IMG'
                     ) && isNodeContainedInRange( range, node, true );
-            },
-            false
+            }
         );
 
         // Start at the beginning node of the range and iterate through
@@ -1837,7 +1834,7 @@ var addLinks = function ( frag, root, self ) {
         walker = new TreeWalker( frag, SHOW_TEXT,
                 function ( node ) {
             return !getNearest( node, root, 'A' );
-        }, false ),
+        }),
         defaultAttributes = self._config.tagAttributes.a,
         node, data, parent, match, index, endIndex, child;
     while ( node = walker.nextNode() ) {
