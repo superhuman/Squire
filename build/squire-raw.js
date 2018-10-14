@@ -1356,11 +1356,18 @@ var onKey = function ( event ) {
     if ( this._keyHandlers[ key ] ) {
         this._keyHandlers[ key ]( this, event, range );
 <<<<<<< HEAD
+<<<<<<< HEAD
     } else if ( key.length === 1 && !range.collapsed ) {
         var initialStartOffset = range.startOffset
 =======
     } else if ( !range.collapsed && ( event.key || key ).length === 1 ) {
 >>>>>>> b0ac7d3... Handle all cases of overwriting content
+=======
+    // !event.isComposing stops us from blatting Kana-Kanji conversion in Safari
+    } else if ( !range.collapsed && !event.isComposing &&
+            !event.ctrlKey && !event.metaKey &&
+            ( event.key || key ).length === 1 ) {
+>>>>>>> 5b998f5... Fix Kana-Kanji input on Mac Safari
         // Record undo checkpoint.
         this.saveUndoState( range );
         // Delete the selection
