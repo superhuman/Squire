@@ -280,7 +280,13 @@ function hasTagAttributes ( node, tag, attributes ) {
         return false;
     }
     for ( var attr in attributes ) {
-        if ( node.getAttribute( attr ) !== attributes[ attr ] ) {
+        // we are adding classes with carbonize to the editor's html, this screws up
+        // squire's classes used for editting
+        if ( attr === "class" ) {
+          if ( !node.getAttribute( attr ).includes( attributes[ attr ] ) ) {
+            return false;
+          }
+        } else if ( node.getAttribute( attr ) !== attributes[ attr ] ) {
             return false;
         }
     }
