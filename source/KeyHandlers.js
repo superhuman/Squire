@@ -69,13 +69,13 @@ var onKey = function ( event ) {
 
         // double clicking a word and typing deletes the space after it
         // caused because a '  ' is automatically cleaned by the HTML to ' '
-        // the fix inserts a ZWS in between the spaces => ' \u200b '
+        // the fix inserts a ZWS in between the spaces => ' \uFEFF '
         // and leaves the ZWS selected so it is replaced by the onKey event
         var textContent = range.startContainer.textContent
         var spliceIndex = range.startOffset
         // if the delete was successful, the startContainer should be the endContainer
         if (range.startContainer === range.endContainer && textContent.charAt( spliceIndex ) === ' ' && textContent.charAt( spliceIndex - 1 ) === ' ') {
-          range.startContainer.textContent = textContent.substring( 0, spliceIndex ) + '\u200b' + textContent.substring( spliceIndex, textContent.length )
+          range.startContainer.textContent = textContent.substring( 0, spliceIndex ) + '\uFEFF' + textContent.substring( spliceIndex, textContent.length )
           range.setStart( range.startContainer, initialStartOffset );
           range.setEnd( range.startContainer, initialStartOffset + 1 );
         }
@@ -291,7 +291,7 @@ var keyHandlers = {
             self.hasFormat( 'span', null, range )
         ) {
             var current = getStartBlockOfRange( range, root );
-            if ( current && current.firstChild.innerText && getLength( current.firstChild.innerText.replace(/^\u200b*/, '') ) == 1 ) {
+            if ( current && current.firstChild.innerText && getLength( current.firstChild.innerText.replace(/^\uFEFF*/, '') ) == 1 ) {
                 event.preventDefault();
                 current.firstChild.innerText = '';
                 insertNodeInRange( range, self._doc.createTextNode( ZWS ) );
@@ -379,7 +379,7 @@ var keyHandlers = {
             self.hasFormat( 'span', null, range )
         ) {
             var current = getStartBlockOfRange( range, root );
-            if ( current && current.firstChild.innerText && getLength( current.firstChild.innerText.replace(/^\u200b*/, '') ) == 1 ) {
+            if ( current && current.firstChild.innerText && getLength( current.firstChild.innerText.replace(/^\uFEFF*/, '') ) == 1 ) {
                 event.preventDefault();
                 current.firstChild.innerText = '';
                 insertNodeInRange( range, self._doc.createTextNode( ZWS ) );

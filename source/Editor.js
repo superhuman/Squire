@@ -1681,7 +1681,7 @@ proto.getHTML = function ( withBookMark ) {
             }
         }
     }
-    html = this._getHTML().replace( /\u200B/g, '' );
+    html = this._getHTML().replace( /\uFEFF/g, '' );
     if ( useTextFixer ) {
         l = brs.length;
         while ( l-- ) {
