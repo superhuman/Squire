@@ -87,11 +87,13 @@ function Squire ( root, config ) {
     // IE sometimes fires the beforepaste event twice; make sure it is not run
     // again before our after paste function is called.
     this._awaitingPaste = false;
-    this.addEventListener( isIElt11 ? 'beforecut' : 'cut', onCut );
-    this.addEventListener( 'copy', onCopy );
+    if (!config.disableCopyPaste) {
+        this.addEventListener( isIElt11 ? 'beforecut' : 'cut', onCut );
+        this.addEventListener( 'copy', onCopy );
+        this.addEventListener( isIElt11 ? 'beforepaste' : 'paste', onPaste );
+    }
     this.addEventListener( 'keydown', monitorShiftKey );
     this.addEventListener( 'keyup', monitorShiftKey );
-    this.addEventListener( isIElt11 ? 'beforepaste' : 'paste', onPaste );
     this.addEventListener( 'drop', onDrop );
 
     // Opera does not fire keydown repeatedly.
@@ -1412,7 +1414,7 @@ var makeSpecialElement = function ( self, frag, type, marginLeft ) {
         listAttrs = tagAttributes[ type.toLowerCase() ],
         listItemAttrs = self._config.blockTag.toLowerCase(),
         root = self._root;
-    
+
     while ( node = walker.nextNode() ) {
         if ( node.parentNode.nodeName === 'div' ) {
             node = node.parentNode;
