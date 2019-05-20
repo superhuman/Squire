@@ -2603,7 +2603,7 @@ function Squire ( root, config ) {
     // IE sometimes fires the beforepaste event twice; make sure it is not run
     // again before our after paste function is called.
     this._awaitingPaste = false;
-    if (!config.disableCopyPaste) {
+    if (!config || !config.disableCopyPaste) {
         this.addEventListener( isIElt11 ? 'beforecut' : 'cut', onCut );
         this.addEventListener( 'copy', onCopy );
         this.addEventListener( isIElt11 ? 'beforepaste' : 'paste', onPaste );
