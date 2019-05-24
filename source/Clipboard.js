@@ -3,8 +3,9 @@
 // The (non-standard but supported enough) innerText property is based on the
 // render tree in Firefox and possibly other browsers, so we must insert the
 // DOM node into the document to ensure the text part is correct.
-var setClipboardData = function ( clipboardData, node, root ) {
+var setClipboardData = function ( clipboardData, node, root, config ) {
     var body = node.ownerDocument.body;
+    var willCutCopy = config.willCutCopy;
     var html, text;
 
     // Firefox will add an extra new line for BRs at the end of block when
@@ -17,6 +18,10 @@ var setClipboardData = function ( clipboardData, node, root ) {
     body.appendChild( node );
     html = node.innerHTML;
     text = node.innerText || node.textContent;
+
+    if ( willCutCopy ) {
+        html = willCutCopy( html );
+    }
 
     // Firefox (and others?) returns unix line endings (\n) even on Windows.
     // If on Windows, normalise to \r\n, since Notepad and some other crappy
@@ -72,7 +77,7 @@ var onCut = function ( event ) {
         // Set clipboard data
         node = this.createElement( 'div' );
         node.appendChild( contents );
-        setClipboardData( clipboardData, node, root );
+        setClipboardData( clipboardData, node, root, this._config );
         event.preventDefault();
     } else {
         setTimeout( function () {
@@ -124,7 +129,7 @@ var onCopy = function ( event ) {
         // Set clipboard data
         node = this.createElement( 'div' );
         node.appendChild( contents );
-        setClipboardData( clipboardData, node, root );
+        setClipboardData( clipboardData, node, root, this._config );
         event.preventDefault();
     }
 };
@@ -140,39 +145,46 @@ var onPaste = function ( event ) {
     var items = clipboardData && clipboardData.items;
     var choosePlain = this.isShiftDown;
     var fireDrop = false;
+    var hasRTF = false;
     var hasImage = false;
     var plainItem = null;
+    var htmlItem = null;
     var self = this;
     var l, item, type, types, data;
 
     // Current HTML5 Clipboard interface
     // ---------------------------------
     // https://html.spec.whatwg.org/multipage/interaction.html
-
-    // Edge only provides access to plain text as of 2016-03-11.
-    if ( !isEdge && items ) {
-        event.preventDefault();
+    if ( items ) {
         l = items.length;
         while ( l-- ) {
             item = items[l];
             type = item.type;
-            if ( !choosePlain && type === 'text/html' ) {
-                /*jshint loopfunc: true */
-                item.getAsString( function ( html ) {
-                    self.insertHTML( html, true );
-                });
-                /*jshint loopfunc: false */
-                return;
-            }
-            if ( type === 'text/plain' ) {
+            if ( type === 'text/html' ) {
+                htmlItem = item;
+            // iOS copy URL gives you type text/uri-list which is just a list
+            // of 1 or more URLs separated by new lines. Can just treat as
+            // plain text.
+            } else if ( type === 'text/plain' || type === 'text/uri-list' ) {
                 plainItem = item;
-            }
-            if ( !choosePlain && /^image\/.*/.test( type ) ) {
+            } else if ( type === 'text/rtf' ) {
+                hasRTF = true;
+            } else if ( /^image\/.*/.test( type ) ) {
                 hasImage = true;
             }
         }
-        // Treat image paste as a drop of an image file.
-        if ( hasImage ) {
+
+        // Treat image paste as a drop of an image file. When you copy
+        // an image in Chrome/Firefox (at least), it copies the image data
+        // but also an HTML version (referencing the original URL of the image)
+        // and a plain text version.
+        //
+        // However, when you copy in Excel, you get html, rtf, text, image;
+        // in this instance you want the html version! So let's try using
+        // the presence of text/rtf as an indicator to choose the html version
+        // over the image.
+        if ( hasImage && !( hasRTF && htmlItem ) ) {
+            event.preventDefault();
             this.fireEvent( 'dragover', {
                 dataTransfer: clipboardData,
                 /*jshint loopfunc: true */
@@ -186,12 +198,26 @@ var onPaste = function ( event ) {
                     dataTransfer: clipboardData
                 });
             }
-        } else if ( plainItem ) {
-            plainItem.getAsString( function ( text ) {
-                self.insertPlainText( text, true );
-            });
+            return;
         }
-        return;
+
+        // Edge only provides access to plain text as of 2016-03-11 and gives no
+        // indication there should be an HTML part. However, it does support
+        // access to image data, so we check for that first. Otherwise though,
+        // fall through to fallback clipboard handling methods
+        if ( !isEdge ) {
+            event.preventDefault();
+            if ( htmlItem && ( !choosePlain || !plainItem ) ) {
+                htmlItem.getAsString( function ( html ) {
+                    self.insertHTML( html, true );
+                });
+            } else if ( plainItem ) {
+                plainItem.getAsString( function ( text ) {
+                    self.insertPlainText( text, true );
+                });
+            }
+            return;
+        }
     }
 
     // Old interface
@@ -279,7 +305,7 @@ var onPaste = function ( event ) {
                 html += pasteArea.innerHTML;
             }
 
-            range = self._createRange(
+            range = self.createRange(
                 startContainer, startOffset, endContainer, endOffset );
             self.setSelection( range );
 
